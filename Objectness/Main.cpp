@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
 {
 	//CStr wkDir = "D:/WkDir/DetectionProposals/VOC2007/Local/";
 	//illutrateLoG();
-	RunObjectness("WinRecall.m", 2, 8, 2, 130);
+    RunObjectness("WinRecall.m", 2, 8, 2, 130);
 
 	return 0;
 }
@@ -38,8 +38,52 @@ void RunObjectness(CStr &resName, double base, int W, int NSS, int numPerSz)
 	printf("%s Base = %g, W = %d, NSS = %d, perSz = %d\n", _S(resName), base, W, NSS, numPerSz);
 	
 	Objectness objNess(voc, base, W, NSS);
+    //objNess.trainObjectness(numPerSz);
+    objNess.loadTrainedModel();
 
-	vector<vector<Vec4i> > boxesTests;
+    ValStructVec<float, Vec4i> valBoxes;
+
+    cv::Mat img = cv::imread("test.jpg");
+    objNess.getObjBndBoxes(img, valBoxes);
+    valBoxes.sort();
+    printf(">> %d \n", valBoxes.size() );
+    cv::Mat res = Mat::zeros(img.rows, img.cols, CV_8UC1);
+    uchar mx = 0;
+
+    for(unsigned int i=0; i<valBoxes.size(); i++)
+    {
+        //if(i > valBoxes.size()*0.7 || i < valBoxes.size()*0.5)
+        //    continue;
+        Rect r;
+        r.x = valBoxes[i][0];
+        r.y = valBoxes[i][1];
+        r.width = valBoxes[i][2]-r.x;
+        r.height = valBoxes[i][3]-r.y;
+        for(int ii = r.x; ii < r.x+r.width; ii++ )
+            for(int jj = r.y; jj < r.y+r.height; jj++ )
+            {
+                if(res.at<uchar>(jj,ii) < 255)
+                    res.at<uchar>(jj,ii) += 1;
+
+                mx = (mx > res.at<uchar>(jj,ii) ) ? mx : res.at<uchar>(jj,ii);
+            }
+
+
+
+        //cv::rectangle(img, r, Scalar( 0, 255, 255 ));
+        //printf(">> %f \n", valBoxes(i) );
+    }
+
+    float x = 255.0/mx;
+    printf(">> %d \n", mx );
+
+    for(int ii = 0; ii < res.cols; ii++ )
+        for(int jj = 0; jj < res.rows; jj++ )
+        {
+                res.at<uchar>(jj,ii) *= x;
+        }
+
+    imwrite("res.jpg", res);
 	//objNess.getObjBndBoxesForTests(boxesTests, 250);
 
 	//If running this for the first time, set preloadModel to false.
@@ -50,8 +94,8 @@ void RunObjectness(CStr &resName, double base, int W, int NSS, int numPerSz)
 	//To avoid running out of memory, you can load images only during
 	//prediction by setting preloadImages to false.
 
-	bool preloadModel = false, preloadImages = false;
-	objNess.getObjBndBoxesForTestsFast(boxesTests, numPerSz, preloadModel, preloadImages);
+    //bool preloadModel = true, preloadImages = false;
+    //objNess.getObjBndBoxesForTestsFast(boxesTests, numPerSz, preloadModel, preloadImages);
 	//objNess.getRandomBoxes(boxesTests);
 
 	//objNess.evaluatePerClassRecall(boxesTests, resName, numPerSz);
